@@ -21,6 +21,7 @@ interface Payment {
   orders: {
     order_number: string;
     supplier_name: string;
+    account_number: string;
   };
 }
 
@@ -44,7 +45,8 @@ const Payment = () => {
           *,
           orders (
             order_number,
-            supplier_name
+            supplier_name,
+            account_number
           )
         `)
         .order("created_at", { ascending: false });
@@ -196,6 +198,12 @@ const Payment = () => {
                         <p className="text-sm text-muted-foreground">Pemasok</p>
                         <p className="font-medium">{payment.orders?.supplier_name || "-"}</p>
                       </div>
+                      {payment.orders?.account_number && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">No. Rekening Pelanggan/Pemasok</p>
+                          <p className="font-mono font-bold text-lg">{payment.orders.account_number}</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm text-muted-foreground">Total Pembayaran</p>
                         <p className="text-2xl font-bold text-primary">

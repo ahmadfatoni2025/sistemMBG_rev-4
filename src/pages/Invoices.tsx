@@ -3,7 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FileText, Truck, CreditCard, Building2 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 interface Invoice {
   id: string;
@@ -11,6 +18,7 @@ interface Invoice {
   total_amount: number;
   status: string;
   created_at: string;
+  user_id: string;
   invoice_items?: Array<{
     product_name: string;
     quantity: number;
@@ -21,6 +29,8 @@ interface Invoice {
 const Invoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [accountNumber, setAccountNumber] = useState("");
 
   useEffect(() => {
     fetchInvoices();
@@ -54,6 +64,182 @@ const Invoices = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportPDF = (invoice: Invoice) => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Invoice", 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Invoice Number: ${invoice.invoice_number}`, 14, 30);
+    doc.text(`Date: ${new Date(invoice.created_at).toLocaleDateString('id-ID')}`, 14, 37);
+    doc.text(`Total: Rp ${invoice.total_amount.toLocaleString()}`, 14, 44);
+    
+    if (invoice.invoice_items && invoice.invoice_items.length > 0) {
+      autoTable(doc, {
+        startY: 50,
+        head: [['Product', 'Quantity', 'Price', 'Total']],
+        body: invoice.invoice_items.map(item => [
+          item.product_name,
+          item.quantity,
+          `Rp ${item.price.toLocaleString()}`,
+          `Rp ${(item.quantity * item.price).toLocaleString()}`
+        ])
+      });
+    }
+    
+    doc.save(`invoice-${invoice.invoice_number}.pdf`);
+    toast({ title: "Success", description: "PDF exported successfully" });
+  };
+
+  const handleExportExcel = (invoice: Invoice) => {
+    const wsData = [
+      ['Invoice Number', invoice.invoice_number],
+      ['Date', new Date(invoice.created_at).toLocaleDateString('id-ID')],
+      ['Status', invoice.status],
+      ['Total Amount', invoice.total_amount],
+      [],
+      ['Product Name', 'Quantity', 'Price', 'Total']
+    ];
+    
+    if (invoice.invoice_items) {
+      invoice.invoice_items.forEach(item => {
+        wsData.push([
+          item.product_name,
+          item.quantity,
+          item.price,
+          item.quantity * item.price
+        ]);
+      });
+    }
+    
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Invoice");
+    XLSX.writeFile(wb, `invoice-${invoice.invoice_number}.xlsx`);
+    toast({ title: "Success", description: "Excel exported successfully" });
+  };
+
+  const handleSubmitShipment = async (invoice: Invoice) => {
+    try {
+      const { data: order, error } = await (supabase as any)
+        .from("orders")
+        .select("id")
+        .eq("user_id", invoice.user_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+
+      if (order) {
+        const { error: updateError } = await (supabase as any)
+          .from("orders")
+          .update({ status: "processing" })
+          .eq("id", order.id);
+
+        if (updateError) throw updateError;
+
+        toast({
+          title: "Berhasil",
+          description: "Pengiriman berhasil diajukan dan dipindahkan ke menu proses",
+        });
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Error",
+        description: "Gagal mengajukan pengiriman",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePayDirectly = async (invoice: Invoice) => {
+    try {
+      const { data: order, error } = await (supabase as any)
+        .from("orders")
+        .select("id")
+        .eq("user_id", invoice.user_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+
+      if (order) {
+        const paymentNumber = `PAY-${Date.now()}`;
+        const { error: paymentError } = await (supabase as any)
+          .from("payments")
+          .insert({
+            payment_number: paymentNumber,
+            order_id: order.id,
+            amount: invoice.total_amount,
+            status: "pending",
+            payment_method: "bank_transfer",
+          });
+
+        if (paymentError) throw paymentError;
+
+        toast({
+          title: "Berhasil",
+          description: "Pembayaran berhasil dibuat, silakan cek menu pembayaran",
+        });
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Error",
+        description: "Gagal membuat pembayaran",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveAccountNumber = async () => {
+    if (!selectedInvoice || !accountNumber) {
+      toast({
+        title: "Error",
+        description: "Nomor rekening tidak boleh kosong",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data: order, error } = await (supabase as any)
+        .from("orders")
+        .select("id")
+        .eq("user_id", selectedInvoice.user_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+
+      if (order) {
+        const { error: updateError } = await (supabase as any)
+          .from("orders")
+          .update({ account_number: accountNumber })
+          .eq("id", order.id);
+
+        if (updateError) throw updateError;
+
+        toast({
+          title: "Berhasil",
+          description: "Nomor rekening berhasil disimpan",
+        });
+        setAccountNumber("");
+        setSelectedInvoice(null);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Error",
+        description: "Gagal menyimpan nomor rekening",
+        variant: "destructive",
+      });
     }
   };
 
@@ -116,6 +302,69 @@ const Invoices = () => {
                         ))}
                       </div>
                     )}
+                    <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleExportPDF(invoice)}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Export PDF
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleExportExcel(invoice)}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Export Excel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleSubmitShipment(invoice)}
+                      >
+                        <Truck className="w-4 h-4 mr-2" />
+                        Ajukan Pengiriman
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handlePayDirectly(invoice)}
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Bayar Langsung
+                      </Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setSelectedInvoice(invoice)}
+                          >
+                            <Building2 className="w-4 h-4 mr-2" />
+                            Tambah No. Rekening
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Tambah Nomor Rekening</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="accountNumber">Nomor Rekening Pelanggan/Pemasok</Label>
+                              <Input
+                                id="accountNumber"
+                                placeholder="Masukkan nomor rekening"
+                                value={accountNumber}
+                                onChange={(e) => setAccountNumber(e.target.value)}
+                              />
+                            </div>
+                            <Button onClick={handleSaveAccountNumber} className="w-full">
+                              Simpan
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

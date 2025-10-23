@@ -16,6 +16,7 @@ interface Order {
   order_date: string;
   delivery_date: string;
   notes: string;
+  account_number: string;
 }
 
 const Process = () => {
@@ -200,6 +201,7 @@ const Process = () => {
                   <TableRow>
                     <TableHead>No. Pesanan</TableHead>
                     <TableHead>Pemasok</TableHead>
+                    <TableHead>No. Rekening</TableHead>
                     <TableHead>Tanggal Pesan</TableHead>
                     <TableHead>Tanggal Kirim</TableHead>
                     <TableHead className="text-right">Total</TableHead>
@@ -212,6 +214,9 @@ const Process = () => {
                     <TableRow key={order.id}>
                       <TableCell className="font-medium">{order.order_number}</TableCell>
                       <TableCell>{order.supplier_name || "-"}</TableCell>
+                      <TableCell>
+                        <span className="font-mono font-semibold">{order.account_number || "-"}</span>
+                      </TableCell>
                       <TableCell>{new Date(order.order_date).toLocaleDateString('id-ID')}</TableCell>
                       <TableCell>
                         {order.delivery_date 
