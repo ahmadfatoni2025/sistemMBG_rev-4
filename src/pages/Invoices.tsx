@@ -33,6 +33,7 @@ const Invoices = () => {
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [accountNumber, setAccountNumber] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchInvoices();
@@ -131,23 +132,30 @@ const Invoices = () => {
         .eq("user_id", invoice.user_id)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (order) {
-        const { error: updateError } = await (supabase as any)
-          .from("orders")
-          .update({ status: "processing" })
-          .eq("id", order.id);
-
-        if (updateError) throw updateError;
-
+      if (!order) {
         toast({
-          title: "Berhasil",
-          description: "Pengiriman berhasil diajukan dan dipindahkan ke menu proses",
+          title: "Error",
+          description: "Tidak ada pesanan yang ditemukan",
+          variant: "destructive",
         });
+        return;
       }
+
+      const { error: updateError } = await (supabase as any)
+        .from("orders")
+        .update({ status: "processing" })
+        .eq("id", order.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Berhasil",
+        description: "Pengiriman berhasil diajukan dan dipindahkan ke menu proses",
+      });
     } catch (error) {
       console.error("Error:", error);
       toast({
@@ -166,32 +174,39 @@ const Invoices = () => {
         .eq("user_id", invoice.user_id)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (order) {
-        const paymentNumber = `PAY-${Date.now()}`;
-        const { error: paymentError } = await (supabase as any)
-          .from("payments")
-          .insert({
-            payment_number: paymentNumber,
-            order_id: order.id,
-            amount: invoice.total_amount,
-            status: "pending",
-            payment_method: "bank_transfer",
-          });
-
-        if (paymentError) throw paymentError;
-
+      if (!order) {
         toast({
-          title: "Berhasil",
-          description: "Pembayaran berhasil dibuat, mengarahkan ke menu pembayaran...",
+          title: "Error",
+          description: "Tidak ada pesanan yang ditemukan",
+          variant: "destructive",
         });
-        
-        // Navigate to payment page
-        setTimeout(() => navigate("/payment"), 1000);
+        return;
       }
+
+      const paymentNumber = `PAY-${Date.now()}`;
+      const { error: paymentError } = await (supabase as any)
+        .from("payments")
+        .insert({
+          payment_number: paymentNumber,
+          order_id: order.id,
+          amount: invoice.total_amount,
+          status: "pending",
+          payment_method: "bank_transfer",
+        });
+
+      if (paymentError) throw paymentError;
+
+      toast({
+        title: "Berhasil",
+        description: "Pembayaran berhasil dibuat, mengarahkan ke menu pembayaran...",
+      });
+      
+      // Navigate to payment page
+      setTimeout(() => navigate("/payment"), 1000);
     } catch (error) {
       console.error("Error:", error);
       toast({
@@ -203,7 +218,7 @@ const Invoices = () => {
   };
 
   const handleSaveAccountNumber = async () => {
-    if (!selectedInvoice || !accountNumber) {
+    if (!selectedInvoice || !accountNumber.trim()) {
       toast({
         title: "Error",
         description: "Nomor rekening tidak boleh kosong",
@@ -219,25 +234,34 @@ const Invoices = () => {
         .eq("user_id", selectedInvoice.user_id)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (order) {
-        const { error: updateError } = await (supabase as any)
-          .from("orders")
-          .update({ account_number: accountNumber })
-          .eq("id", order.id);
-
-        if (updateError) throw updateError;
-
+      if (!order) {
         toast({
-          title: "Berhasil",
-          description: "Nomor rekening berhasil disimpan",
+          title: "Error",
+          description: "Tidak ada pesanan yang ditemukan",
+          variant: "destructive",
         });
-        setAccountNumber("");
-        setSelectedInvoice(null);
+        return;
       }
+
+      const { error: updateError } = await (supabase as any)
+        .from("orders")
+        .update({ account_number: accountNumber })
+        .eq("id", order.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Berhasil",
+        description: "Nomor rekening berhasil disimpan",
+      });
+      
+      setAccountNumber("");
+      setSelectedInvoice(null);
+      setDialogOpen(false);
     } catch (error) {
       console.error("Error:", error);
       toast({
@@ -338,12 +362,15 @@ const Invoices = () => {
                         <CreditCard className="w-4 h-4 mr-2" />
                         Bayar Langsung
                       </Button>
-                      <Dialog>
+                      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                         <DialogTrigger asChild>
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => setSelectedInvoice(invoice)}
+                            onClick={() => {
+                              setSelectedInvoice(invoice);
+                              setDialogOpen(true);
+                            }}
                           >
                             <Building2 className="w-4 h-4 mr-2" />
                             Tambah No. Rekening

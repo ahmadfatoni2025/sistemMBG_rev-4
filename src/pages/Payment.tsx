@@ -106,9 +106,19 @@ const Payment = () => {
         .from("payments")
         .select("order_id")
         .eq("id", paymentId)
-        .single();
+        .maybeSingle();
 
       if (paymentFetchError) throw paymentFetchError;
+      
+      if (!paymentData || !paymentData.order_id) {
+        toast({
+          title: "Error",
+          description: "Pembayaran tidak ditemukan atau tidak memiliki pesanan terkait",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const orderId = paymentData.order_id;
 
       // Update payment status
@@ -170,6 +180,15 @@ const Payment = () => {
   };
 
   const handleExportPDF = (payment: Payment) => {
+    if (!payment.orders) {
+      toast({ 
+        title: "Error", 
+        description: "Data pesanan tidak lengkap untuk export PDF",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const doc = new jsPDF();
     
     // Header
@@ -186,18 +205,18 @@ const Payment = () => {
     doc.setFontSize(14);
     doc.text("Informasi Pesanan", 14, 60);
     doc.setFontSize(11);
-    doc.text(`No. Pesanan: ${payment.orders?.order_number || "-"}`, 14, 68);
-    doc.text(`Tanggal Pesanan: ${payment.orders?.order_date ? new Date(payment.orders.order_date).toLocaleDateString('id-ID') : "-"}`, 14, 75);
-    doc.text(`Pemasok: ${payment.orders?.supplier_name || "-"}`, 14, 82);
-    doc.text(`Kontak: ${payment.orders?.supplier_contact || "-"}`, 14, 89);
-    doc.text(`Status Pesanan: ${payment.orders?.status || "-"}`, 14, 96);
-    doc.text(`Tanggal Pengiriman: ${payment.orders?.delivery_date ? new Date(payment.orders.delivery_date).toLocaleDateString('id-ID') : "-"}`, 14, 103);
+    doc.text(`No. Pesanan: ${payment.orders.order_number || "-"}`, 14, 68);
+    doc.text(`Tanggal Pesanan: ${payment.orders.order_date ? new Date(payment.orders.order_date).toLocaleDateString('id-ID') : "-"}`, 14, 75);
+    doc.text(`Pemasok: ${payment.orders.supplier_name || "-"}`, 14, 82);
+    doc.text(`Kontak: ${payment.orders.supplier_contact || "-"}`, 14, 89);
+    doc.text(`Status Pesanan: ${payment.orders.status || "-"}`, 14, 96);
+    doc.text(`Tanggal Pengiriman: ${payment.orders.delivery_date ? new Date(payment.orders.delivery_date).toLocaleDateString('id-ID') : "-"}`, 14, 103);
     
     // Account Numbers
     doc.setFontSize(14);
     doc.text("Informasi Rekening", 14, 115);
     doc.setFontSize(11);
-    if (payment.orders?.account_number) {
+    if (payment.orders.account_number) {
       doc.text(`No. Rekening Pelanggan/Pemasok: ${payment.orders.account_number}`, 14, 123);
     }
     if (payment.bank_name && payment.account_number) {
@@ -206,7 +225,7 @@ const Payment = () => {
     }
     
     // Items Table
-    if (payment.orders?.order_items && payment.orders.order_items.length > 0) {
+    if (payment.orders.order_items && payment.orders.order_items.length > 0) {
       doc.setFontSize(14);
       doc.text("Detail Produk", 14, 150);
       
@@ -214,10 +233,10 @@ const Payment = () => {
         startY: 155,
         head: [['Produk', 'Jumlah', 'Harga Satuan', 'Total']],
         body: payment.orders.order_items.map(item => [
-          item.product_name,
-          item.quantity.toString(),
-          `Rp ${item.unit_price.toLocaleString()}`,
-          `Rp ${item.total_price.toLocaleString()}`
+          item.product_name || "-",
+          item.quantity?.toString() || "0",
+          `Rp ${(item.unit_price || 0).toLocaleString()}`,
+          `Rp ${(item.total_price || 0).toLocaleString()}`
         ]),
         foot: [['', '', 'Total Pembayaran:', `Rp ${payment.amount.toLocaleString()}`]],
         theme: 'grid',
@@ -225,11 +244,12 @@ const Payment = () => {
     }
     
     // Notes
-    if (payment.orders?.notes) {
+    if (payment.orders.notes) {
       const finalY = (doc as any).lastAutoTable?.finalY || 180;
       doc.setFontSize(11);
       doc.text("Catatan:", 14, finalY + 10);
-      doc.text(payment.orders.notes, 14, finalY + 17, { maxWidth: 180 });
+      const splitNotes = doc.splitTextToSize(payment.orders.notes, 180);
+      doc.text(splitNotes, 14, finalY + 17);
     }
     
     // Address Link
@@ -303,7 +323,7 @@ const Payment = () => {
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">No. Pesanan</p>
-                          <p className="font-medium">{payment.orders?.order_number}</p>
+                          <p className="font-medium">{payment.orders?.order_number || "-"}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Tanggal Pesanan</p>
