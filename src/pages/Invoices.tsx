@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ interface Invoice {
 }
 
 const Invoices = () => {
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -184,8 +186,11 @@ const Invoices = () => {
 
         toast({
           title: "Berhasil",
-          description: "Pembayaran berhasil dibuat, silakan cek menu pembayaran",
+          description: "Pembayaran berhasil dibuat, mengarahkan ke menu pembayaran...",
         });
+        
+        // Navigate to payment page
+        setTimeout(() => navigate("/payment"), 1000);
       }
     } catch (error) {
       console.error("Error:", error);
