@@ -26,6 +26,7 @@ const navItems = [
   { to: "/returns", icon: RotateCcw, label: "Retur" },
   { to: "/rejected", icon: Ban, label: "Retur & Pengembalian" },
   { to: "/payment", icon: Wallet, label: "Pembayaran" },
+  { to: "/pembayaran", icon: Wallet, label: "Scan to Pay" },
   { to: "/products", icon: Package, label: "Inventori Bahan Baku" },
   { to: "/analytics", icon: TrendingUp, label: "Analisis Bahan Baku" },
   { to: "/food-condition", icon: AlertCircle, label: "Kualitas Bahan Baku" },

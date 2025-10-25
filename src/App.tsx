@@ -21,6 +21,7 @@ import Order from "./pages/Order";
 import Recap from "./pages/Recap";
 import Process from "./pages/Process";
 import Payment from "./pages/Payment";
+import ScanToPay from "./pages/ScanToPay";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
                           <Route path="/returns" element={<Returns />} />
                           <Route path="/rejected" element={<Rejected />} />
                           <Route path="/payment" element={<Payment />} />
+                          <Route path="/pembayaran" element={<ScanToPay />} />
                           <Route path="/products" element={<Products />} />
                           <Route path="/analytics" element={<Analytics />} />
                           <Route path="/food-condition" element={<FoodCondition />} />
